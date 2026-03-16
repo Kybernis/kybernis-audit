@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/kybernis/kybernis-audit/pkg/evaluator"
 	"github.com/kybernis/kybernis-audit/pkg/scenario"
 	"github.com/kybernis/kybernis-audit/pkg/telemetry"
 )
@@ -17,9 +18,10 @@ type ChaosInterceptor struct {
 	targetURL *url.URL
 	tracker   *telemetry.Tracker
 	config    *scenario.Config
+	evaluator *evaluator.Tracker
 }
 
-func NewChaosInterceptor(target string, tracker *telemetry.Tracker, cfg *scenario.Config) (*ChaosInterceptor, error) {
+func NewChaosInterceptor(target string, tracker *telemetry.Tracker, cfg *scenario.Config, eval *evaluator.Tracker) (*ChaosInterceptor, error) {
 	u, err := url.Parse(target)
 	if err != nil {
 		return nil, err
@@ -28,13 +30,13 @@ func NewChaosInterceptor(target string, tracker *telemetry.Tracker, cfg *scenari
 		targetURL: u,
 		tracker:   tracker,
 		config:    cfg,
+		evaluator: eval,
 	}, nil
 }
 
 func (c *ChaosInterceptor) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	proxy := httputil.NewSingleHostReverseProxy(c.targetURL)
 
-	// Custom transport to inject chaos
 	proxy.Transport = &chaosTransport{
 		transport:   http.DefaultTransport,
 		interceptor: c,
@@ -49,6 +51,24 @@ type chaosTransport struct {
 }
 
 func (t *chaosTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Read and restore the request body so the proxy can forward it
+	var reqBody []byte
+	if req.Body != nil {
+		reqBody, _ = io.ReadAll(req.Body)
+		req.Body = io.NopCloser(bytes.NewBuffer(reqBody))
+	}
+
+	isTarget := strings.Contains(req.URL.Path, t.interceptor.config.TargetEndpoint)
+	injectTimeout := isTarget && t.interceptor.config.FaultInjection == "timeout_after_success"
+
+	faultToInject := ""
+	if injectTimeout {
+		faultToInject = "timeout"
+	}
+
+	// Record request to evaluate semantic drift
+	t.interceptor.evaluator.RecordAndEvaluate(req.Method, req.URL.Path, reqBody, faultToInject)
+
 	// Let the backend process the request to simulate a real mutation
 	res, err := t.transport.RoundTrip(req)
 	if err != nil {
@@ -56,8 +76,7 @@ func (t *chaosTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	// ⚡ Chaos Injection Point ⚡
-	// We matched the target endpoint. Wait for 200 OK, but return a 504 Timeout to the agent!
-	if strings.Contains(req.URL.Path, t.interceptor.config.TargetEndpoint) && t.interceptor.config.FaultInjection == "timeout_after_success" {
+	if injectTimeout {
 		log.Printf("⚠️ [Chaos Proxy] Mutating response! Backend returned %d, but Agent will receive 504 Gateway Timeout.", res.StatusCode)
 
 		t.interceptor.tracker.TrackEvent("chaos_injected", map[string]interface{}{
@@ -65,18 +84,19 @@ func (t *chaosTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			"fault":    "timeout_after_success",
 		})
 
-		// Swallow the original response body
 		if res.Body != nil {
 			io.Copy(io.Discard, res.Body)
 			res.Body.Close()
 		}
 
-		// Craft the chaos response
 		res.StatusCode = http.StatusGatewayTimeout
 		res.Status = "504 Gateway Timeout"
 		res.Body = io.NopCloser(bytes.NewBufferString("Gateway Timeout (Injected by Kybernis Audit)"))
 		res.Header = make(http.Header)
 		res.Header.Set("Content-Type", "text/plain")
+
+		// Consume the fault injection so retries can succeed
+		t.interceptor.config.FaultInjection = "exhausted"
 	}
 
 	return res, nil

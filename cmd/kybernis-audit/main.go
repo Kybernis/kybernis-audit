@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/kybernis/kybernis-audit/pkg/evaluator"
 	"github.com/kybernis/kybernis-audit/pkg/proxy"
 	"github.com/kybernis/kybernis-audit/pkg/scenario"
 	"github.com/kybernis/kybernis-audit/pkg/telemetry"
@@ -31,7 +32,8 @@ func main() {
 	fmt.Printf("🎯 Scenario: %s\n", cfg.Name)
 	fmt.Printf("💥 Injecting Fault: %s on %s\n", cfg.FaultInjection, cfg.TargetEndpoint)
 
-	interceptor, err := proxy.NewChaosInterceptor(*targetURL, tracker, cfg)
+	eval := evaluator.NewTracker()
+	interceptor, err := proxy.NewChaosInterceptor(*targetURL, tracker, cfg, eval)
 	if err != nil {
 		log.Fatalf("Failed to initialize proxy: %v", err)
 	}
