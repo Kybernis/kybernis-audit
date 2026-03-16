@@ -46,7 +46,7 @@ func (t *Tracker) RecordAndEvaluate(method, path string, body []byte, fault stri
 			if !bytes.Equal(past.Body, body) {
 				finding := Finding{
 					Severity:    "CRITICAL",
-					Message:     "SEMANTIC DRIFT DETECTED",
+					Message:     "DRIFT (Semantic Drift on Retry)",
 					Details:     fmt.Sprintf("Agent retried mutation %s %s but the payload changed!\nOriginal: %s\nRetried:  %s", method, path, string(past.Body), string(body)),
 					Remediation: "Standard idempotency keys will fail. Use a deterministic execution guard (e.g. Kybernis Cloud).",
 				}
@@ -54,7 +54,7 @@ func (t *Tracker) RecordAndEvaluate(method, path string, body []byte, fault stri
 			} else {
 				finding := Finding{
 					Severity:    "WARNING",
-					Message:     "BLIND RETRY DETECTED",
+					Message:     "DART (Duplicate Action, Resubmitted Transaction)",
 					Details:     fmt.Sprintf("Agent retried exact same payload on %s %s after a network timeout.", method, path),
 					Remediation: "Ensure your backend has strict, perfectly deterministic idempotency keys for this endpoint.",
 				}
