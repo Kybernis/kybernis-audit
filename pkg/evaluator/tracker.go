@@ -14,14 +14,23 @@ type Record struct {
 	InjectedFault string
 }
 
+type Finding struct {
+	Severity    string
+	Message     string
+	Details     string
+	Remediation string
+}
+
 type Tracker struct {
-	mu      sync.Mutex
-	history []Record
+	mu       sync.Mutex
+	history  []Record
+	findings []Finding
 }
 
 func NewTracker() *Tracker {
 	return &Tracker{
-		history: make([]Record, 0),
+		history:  make([]Record, 0),
+		findings: make([]Finding, 0),
 	}
 }
 
@@ -32,32 +41,54 @@ func (t *Tracker) RecordAndEvaluate(method, path string, body []byte, fault stri
 	// Check if this is a retry of a previously failed/faulted request
 	for _, past := range t.history {
 		if past.Method == method && past.Path == path && past.InjectedFault != "" {
-			// This is a retry of a faulted endpoint!
 			log.Printf("🔍 Evaluating retry on %s %s...", method, path)
 
 			if !bytes.Equal(past.Body, body) {
-				fmt.Println("\n❌ [KYBERNIS AUDIT FINDING] SEMANTIC DRIFT DETECTED ❌")
-				fmt.Println("   The agent experienced a failure and retried the mutation, but the payload changed!")
-				fmt.Println("   Original Payload: ", string(past.Body))
-				fmt.Printf("   Retried Payload:  %s\n", string(body))
-				fmt.Println("   Vulnerability:    Standard backend idempotency keys will fail. This is a potential double-spend.")
-				fmt.Println("   Fix:              Use a deterministic execution guard (e.g. Kybernis Cloud).")
-				fmt.Println()
+				finding := Finding{
+					Severity:    "CRITICAL",
+					Message:     "SEMANTIC DRIFT DETECTED",
+					Details:     fmt.Sprintf("Agent retried mutation %s %s but the payload changed!\nOriginal: %s\nRetried:  %s", method, path, string(past.Body), string(body)),
+					Remediation: "Standard idempotency keys will fail. Use a deterministic execution guard (e.g. Kybernis Cloud).",
+				}
+				t.findings = append(t.findings, finding)
 			} else {
-				fmt.Println("\n⚠️ [KYBERNIS AUDIT FINDING] BLIND RETRY DETECTED ⚠️")
-				fmt.Println("   The agent retried the exact same mutation after a timeout.")
-				fmt.Println("   If the original request succeeded on the backend, this will cause a double-execution unless your backend idempotency keys are perfect.")
-				fmt.Println()
+				finding := Finding{
+					Severity:    "WARNING",
+					Message:     "BLIND RETRY DETECTED",
+					Details:     fmt.Sprintf("Agent retried exact same payload on %s %s after a network timeout.", method, path),
+					Remediation: "Ensure your backend has strict, perfectly deterministic idempotency keys for this endpoint.",
+				}
+				t.findings = append(t.findings, finding)
 			}
 			return
 		}
 	}
 
-	// First time seeing this request (or not a retry of a faulted one)
 	t.history = append(t.history, Record{
 		Method:        method,
 		Path:          path,
 		Body:          body,
 		InjectedFault: fault,
 	})
+}
+
+func (t *Tracker) PrintSummary() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if len(t.findings) == 0 {
+		fmt.Println("✅ No execution safety vulnerabilities found in this scenario.")
+		return
+	}
+
+	for i, f := range t.findings {
+		icon := "⚠️"
+		if f.Severity == "CRITICAL" {
+			icon = "❌"
+		}
+		fmt.Printf("\n%s Finding %d: [%s] %s\n", icon, i+1, f.Severity, f.Message)
+		fmt.Printf("   Details: %s\n", f.Details)
+		fmt.Printf("   Fix:     %s\n", f.Remediation)
+	}
+	fmt.Println()
 }
