@@ -54,7 +54,7 @@ func (t *Tracker) RecordAndEvaluate(method, path string, body []byte, fault stri
 			} else {
 				finding := Finding{
 					Severity:    "WARNING",
-					Message:     "DART (Duplicate Action, Resubmitted Transaction)",
+					Message:     "DARE (Duplicate Action / Blind Retry)",
 					Details:     fmt.Sprintf("Agent retried exact same payload on %s %s after a network timeout.", method, path),
 					Remediation: "Ensure your backend has strict, perfectly deterministic idempotency keys for this endpoint.",
 				}
