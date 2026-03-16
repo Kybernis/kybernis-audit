@@ -1,7 +1,10 @@
 package scenario
 
 import (
-	"log"
+	"fmt"
+	"os"
+
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
@@ -12,14 +15,15 @@ type Config struct {
 }
 
 func LoadConfig(path string) (*Config, error) {
-	// TODO: Implement actual YAML unmarshalling here
-	log.Printf("[Scenario] Loaded scenario from %s", path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read scenario file: %w", err)
+	}
 
-	// Mock returning a double-spend timeout injection
-	return &Config{
-		Name:           "Double Spend Timeout Test",
-		TargetEndpoint: "/refund",
-		FaultInjection: "timeout_after_success",
-		Invariant:      "no_duplicate_mutations",
-	}, nil
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse scenario yaml: %w", err)
+	}
+
+	return &cfg, nil
 }

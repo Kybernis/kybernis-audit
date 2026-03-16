@@ -1,0 +1,4 @@
+name: "Stripe Double-Charge Timeout Simulation"
+target_endpoint: "/v1/charges"
+fault_injection: "timeout_after_success"
+invariant: "no_duplicate_mutations"
