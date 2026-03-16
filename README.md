@@ -7,10 +7,20 @@ Find duplicate mutations, retry hazards, and ambiguous execution paths before th
 *“Semgrep for Agent Side-Effects.”*
 
 ## The Agent Execution Taxonomy
-Kybernis Audit detects the following execution vulnerabilities:
+Kybernis Audit detects the following execution vulnerabilities based on the official Kybernis Agent Failure Taxonomy:
 
-* **DRIFT (Semantic Drift on Retry):** The agent experienced a network failure, retried the API call, but changed the payload (e.g., generating a new transaction ID). Standard backend idempotency keys fail. **Severity: CRITICAL.**
-* **DART (Duplicate Action, Resubmitted Transaction):** The agent retried the exact same payload blindly. If the first attempt actually succeeded but timed out on the wire, this will cause a duplicate mutation. **Severity: WARNING.**
+1. **DARE (Duplicate Action Replay / Blind Retry)**
+   The agent retries the exact same payload blindly. If the first attempt actually succeeded but timed out on the wire, this will cause a duplicate mutation.
+2. **GHOST (Ghost Execution / Ambiguous Outcome)**
+   The agent fires a mutation, gets a network timeout, and assumes it failed without verifying. The backend actually succeeded, leaving the agent's mental model out of sync with reality.
+3. **DRIFT (Semantic Drift on Retry)**
+   The agent experienced a network failure, retries the API call, but changes the payload (e.g., generating a new transaction ID). Standard backend idempotency keys fail.
+4. **AUTH (Authorization Context Drift)**
+   An execution is approved by a human, but the agent alters the payload or context *after* the approval and before the execution.
+5. **SAGA (Shattered Saga / Incomplete Execution)**
+   An agent completes step 1 of a multi-step operation but crashes or fails before step 2, leaving the system in a corrupted partial state.
+6. **RACE (Parallel Duplicate Race)**
+   Two parallel agents or concurrent reasoning branches arrive at the same conclusion and fire the exact same tool simultaneously.
 
 ## Quick Start
 
