@@ -91,3 +91,33 @@ scenarios:
     payload:
       user_id: "cus_123"
       amount: 50.00
+
+  # ----------------------------------------------------------------------------
+  # 5. GHOST EXECUTION SCENARIO (GHOST)
+  # ----------------------------------------------------------------------------
+  - name: "Ghost Execution (GHOST)"
+    target_url: "http://localhost:3000/api/refund"
+    attack_vector: "ghost"
+    
+    # Options for 'ghost': pre_commit, post_commit
+    # post_commit drops the network connection AFTER the backend processes the mutation 
+    # but BEFORE the agent receives the 200 OK.
+    variant: "post_commit"
+    
+    payload:
+      user_id: "cus_123"
+      amount: 50.00
+
+  # ----------------------------------------------------------------------------
+  # 6. SHATTERED SAGA SCENARIO (SAGA)
+  # ----------------------------------------------------------------------------
+  - name: "Shattered Saga / Incomplete Execution (SAGA)"
+    target_url: "http://localhost:3000/api/refund"
+    attack_vector: "saga"
+    
+    # Options for 'saga': mid_execution_crash, failed_compensation
+    variant: "mid_execution_crash"
+    
+    payload:
+      user_id: "cus_123"
+      amount: 50.00
