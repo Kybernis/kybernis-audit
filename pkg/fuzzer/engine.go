@@ -219,7 +219,7 @@ func (f *Fuzzer) executeSagaAttack() error {
 	
 	f.printMitigation("SAGA", 
 		"The 'Replit AI Database Deletion' (2025): An autonomous agent made code changes without instruction, and during a subsequent failure sequence, it bypassed constraints and deleted the entire production database without rolling back its partial state.",
-		"AWS Step Functions, Temporal workflows, or Saga Pattern Rollback Queues (SQS).", 
+		"AWS Step Functions, Temporal workflows, or Saga Pattern Rollback Queues (SQS).\n\n\t\u26A0\uFE0F Warning on Autonomy: Hardcoding workflows into static Step Functions completely sacrifices the agent's autonomous reasoning. The LLM becomes a mere variable-filler.", 
 		"Kybernis maintains a cross-service orchestration ledger with native rollback support.")
 	return fmt.Errorf("vulnerability_detected: saga")
 }
