@@ -11,6 +11,7 @@ type Config struct {
 	Tool               string                 `yaml:"tool"`
 	Payload            map[string]interface{} `yaml:"payload"`
 	AttackVector       string                 `yaml:"attack_vector"`
+	Variant            string                 `yaml:"variant"` // Granular sub-test
 	IdempotencyKeyPath string                 `yaml:"idempotency_key_path"`
 	AuthMutatePath     string                 `yaml:"auth_mutate_path"`
 	AuthMutateValue    interface{}            `yaml:"auth_mutate_value"`
@@ -36,6 +37,9 @@ func LoadConfig(path string) (Config, error) {
 	}
 	if cfg.DelayMs == 0 {
 		cfg.DelayMs = 1000
+	}
+	if cfg.Variant == "" {
+		cfg.Variant = "standard"
 	}
 
 	return cfg, nil
