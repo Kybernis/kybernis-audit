@@ -79,7 +79,7 @@ Need enforcement in production? [Kybernis SDK](https://kybernis.dev) adds determ
 MIT License
 ## The Execution Attack Variants
 
-Kybernis Audit does not just fire a single test per vulnerability; it simulates the permutations of agent behavior and tests common backend mitigation strategies.
+Kybernis Audit does not just fire a single test per vulnerability; it simulates the permutations of agent behavior and tests common backend mitigation strategies (from Reddit, OpenAI Forums, Vectara's case studies, and enterprise patterns).
 
 ### 1. DARE (Duplicate Action Replay)
 *   `variant: immediate` (Fires blind duplicate instantly)
@@ -90,60 +90,28 @@ Kybernis Audit does not just fire a single test per vulnerability; it simulates 
 ### 2. GHOST (Ghost Execution)
 *   `variant: pre_commit` (Simulates network disconnect *before* backend processes mutation)
 *   `variant: post_commit` (Simulates timeout *after* backend processing, but before agent gets the 200 OK)
-*   🤝 **Community Mitigation:** Async Webhooks, polling mechanisms instead of synchronous HTTP calls.
+*   🤝 **Community Mitigation:** Async Webhooks, polling mechanisms (e.g. `GET /status`) instead of synchronous HTTP calls.
 
 ### 3. DRIFT (Semantic Drift on Retry)
 *   `variant: idempotency_regen` (The classic UUID hallucination on retry)
 *   `variant: hash_bypass` (Injects dummy LLM reasoning strings to mutate the JSON and bypass naive SHA-256 payload deduplication)
-*   🤝 **Community Mitigation:** Strict Pydantic/Zod schema enforcement + payload normalization before hashing.
+*   `variant: semantic_equivalence` (Changes integer `100` to float `100.0` or appends spaces to defeat hash equivalence)
+*   🤝 **Community Mitigation:** Strict Pydantic/Zod schema enforcement + payload canonicalization before hashing.
 
 ### 4. AUTH (Authorization Context Drift)
 *   `variant: privilege_escalation` (Mutates an `admin: false` flag to `true` on the final execution)
 *   `variant: scope_creep` (Changes a target ID, e.g., transferring funds to Account B instead of Account A)
-*   🤝 **Community Mitigation:** LlamaGuard or cryptographically hashing the state *before* asking a human to approve it.
+*   `variant: confused_deputy` (Simulates Cross Plugin Request Forgery where external data overrides approved parameters)
+*   🤝 **Community Mitigation:** NeMo Guardrails, LlamaGuard, or cryptographically hashing state pre-approval.
 
 ### 5. SAGA (Shattered Saga)
 *   `variant: mid_execution_crash` (Simulates an agent crashing halfway through a multi-step tool sequence)
-*   🤝 **Community Mitigation:** AWS Step Functions, Temporal, SQS Dead Letter Queues.
+*   `variant: failed_compensation` (Simulates a failed step 2 to test if the backend natively rolls back step 1)
+*   🤝 **Community Mitigation:** AWS Step Functions, Temporal workflows, SQS Dead Letter Queues.
 
 ### 6. RACE (Parallel Duplicate Race)
 *   `variant: simultaneous` (Fires N requests at the exact same millisecond to test lock absence)
 *   `variant: staggered` (Fires requests sequentially with slight delays to catch distributed locks that release prematurely)
-*   🤝 **Community Mitigation:** Database Row Locks (`SELECT FOR UPDATE`), Redis Redlocks.
-
-*For all of the above, the Kybernis SDK Native State-Machine execution anchoring provides a zero-infrastructure alternative to the community mitigations.*
-## The Execution Attack Variants
-
-Kybernis Audit does not just fire a single test per vulnerability; it simulates the permutations of agent behavior and tests common backend mitigation strategies.
-
-### 1. DARE (Duplicate Action Replay)
-*   `variant: immediate` (Fires blind duplicate instantly)
-*   `variant: delayed` (Waits X ms to bypass rate limiters or cache expiration)
-*   `variant: param_fuzz` (Adds dummy variables like `_retry_count` to bypass strict exact-match API firewalls)
-*   🤝 **Community Mitigation:** Exponential backoff, Redis Token Buckets, strict LLM loop limits.
-
-### 2. GHOST (Ghost Execution)
-*   `variant: pre_commit` (Simulates network disconnect *before* backend processes mutation)
-*   `variant: post_commit` (Simulates timeout *after* backend processing, but before agent gets the 200 OK)
-*   🤝 **Community Mitigation:** Async Webhooks, polling mechanisms instead of synchronous HTTP calls.
-
-### 3. DRIFT (Semantic Drift on Retry)
-*   `variant: idempotency_regen` (The classic UUID hallucination on retry)
-*   `variant: hash_bypass` (Injects dummy LLM reasoning strings to mutate the JSON and bypass naive SHA-256 payload deduplication)
-*   🤝 **Community Mitigation:** Strict Pydantic/Zod schema enforcement + payload normalization before hashing.
-
-### 4. AUTH (Authorization Context Drift)
-*   `variant: privilege_escalation` (Mutates an `admin: false` flag to `true` on the final execution)
-*   `variant: scope_creep` (Changes a target ID, e.g., transferring funds to Account B instead of Account A)
-*   🤝 **Community Mitigation:** LlamaGuard or cryptographically hashing the state *before* asking a human to approve it.
-
-### 5. SAGA (Shattered Saga)
-*   `variant: mid_execution_crash` (Simulates an agent crashing halfway through a multi-step tool sequence)
-*   🤝 **Community Mitigation:** AWS Step Functions, Temporal, SQS Dead Letter Queues.
-
-### 6. RACE (Parallel Duplicate Race)
-*   `variant: simultaneous` (Fires N requests at the exact same millisecond to test lock absence)
-*   `variant: staggered` (Fires requests sequentially with slight delays to catch distributed locks that release prematurely)
-*   🤝 **Community Mitigation:** Database Row Locks (`SELECT FOR UPDATE`), Redis Redlocks.
+*   🤝 **Community Mitigation:** Database Row Locks (`SELECT FOR UPDATE`), Redis Redlocks (Distributed Leases).
 
 *For all of the above, the Kybernis SDK Native State-Machine execution anchoring provides a zero-infrastructure alternative to the community mitigations.*

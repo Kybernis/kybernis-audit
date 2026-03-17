@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -88,7 +87,7 @@ func (f *Fuzzer) executeDareAttack() error {
 	if resB != nil && (resB.StatusCode == 200 || resB.StatusCode == 201) {
 		fmt.Println("\n❌ [FAILED] Backend processed the duplicate blind retry.")
 		f.printMitigation("DARE", 
-			"Implement exponential backoff limits and Redis Token Buckets per user.",
+			"Implement exponential backoff limits, strict LLM loop limits, and Redis Token Buckets per user.",
 			"Native state deduplication prevents re-execution regardless of wait times or fuzzy parameters.")
 		return fmt.Errorf("vulnerability_detected: dare")
 	}
@@ -101,7 +100,6 @@ func (f *Fuzzer) executeDareAttack() error {
 func (f *Fuzzer) executeGhostAttack() error {
 	data, _ := json.Marshal(f.Scenario.Payload)
 	
-	// Pre-commit drop (1ms) vs Post-commit drop (simulated long wait cut off)
 	timeout := 20 * time.Millisecond
 	if f.Scenario.Variant == "post_commit" {
 		timeout = 2 * time.Second
@@ -118,7 +116,7 @@ func (f *Fuzzer) executeGhostAttack() error {
 		fmt.Println("⚠️  [TIMEOUT] Client disconnected before receiving 200 OK.")
 		fmt.Println("    ↳ The agent's mental model is now out of sync with backend reality.")
 		f.printMitigation("GHOST", 
-			"Convert synchronous HTTP tool calls to Async Webhooks or polling mechanisms.",
+			"Convert synchronous HTTP tool calls to Async Webhooks or polling mechanisms (GET /status).",
 			"Persistent Session IDs track execution status. The agent queries Kybernis to verify terminal state on retry.")
 		return fmt.Errorf("vulnerability_detected: ghost")
 	}
@@ -138,15 +136,19 @@ func (f *Fuzzer) executeDriftAttack() error {
 		payloadB = f.injectValue(f.Scenario.Payload, f.Scenario.IdempotencyKeyPath, driftedKey)
 		fmt.Printf("⚠️  [AGENT RETRY] Firing payload with regenerated UUID: %s\n", driftedKey)
 	} else if f.Scenario.Variant == "hash_bypass" {
-		payloadB = f.injectValue(f.Scenario.Payload, "agent_reasoning", "I encountered a timeout so I am retrying.")
+		payloadB = f.injectValue(f.Scenario.Payload, "_agent_reasoning", "I encountered a timeout so I am retrying.")
 		fmt.Println("⚠️  [AGENT RETRY] Firing payload with hallucinated reasoning string to bypass content hashing.")
+	} else if f.Scenario.Variant == "semantic_equivalence" {
+		// Just simulate a type conversion (e.g. 100 -> 100.0)
+		fmt.Println("⚠️  [AGENT RETRY] Firing payload with type coercion (semantic equivalence).")
+		payloadB = f.injectValue(f.Scenario.Payload, "_semantic_drift", 100.0) 
 	}
 
 	resB, _ := f.sendPayload(payloadB)
 	if resB != nil && (resB.StatusCode == 200 || resB.StatusCode == 201) {
 		fmt.Println("\n❌ [FAILED] Backend is bleeding. Semantic double-spend executed.")
 		f.printMitigation("DRIFT",
-			"Strict Pydantic/Zod schema enforcement + SHA-256 content hashing of normalized payloads.",
+			"Strict Pydantic/Zod schema enforcement + JSON canonicalization before SHA-256 content hashing.",
 			"Semantic Locks anchor execution to the task ID, entirely immune to JSON mutation and key regeneration.")
 		return fmt.Errorf("vulnerability_detected: drift")
 	}
@@ -155,27 +157,45 @@ func (f *Fuzzer) executeDriftAttack() error {
 	return nil
 }
 
-// 4. AUTH, 5. SAGA, 6. RACE implementation continuation...
-
+// 4. AUTH (Authorization Context Drift)
 func (f *Fuzzer) executeAuthAttack() error {
 	mutated := f.injectValue(f.Scenario.Payload, f.Scenario.AuthMutatePath, f.Scenario.AuthMutateValue)
-	fmt.Printf("    ↳ Firing execution with mutated context (%s)...\n", f.Scenario.AuthMutatePath)
+	
+	if f.Scenario.Variant == "confused_deputy" {
+		fmt.Println("⚠️  [CPRF] Simulating Cross Plugin Request Forgery via injected external payload data...")
+	} else {
+		fmt.Printf("    ↳ Firing execution with mutated context (%s)...\n", f.Scenario.AuthMutatePath)
+	}
+	
 	res, _ := f.sendPayload(mutated)
 	
 	if res != nil && (res.StatusCode == 200 || res.StatusCode == 201) {
 		fmt.Println("\n❌ [FAILED] Backend accepted the mutated payload post-authorization.")
-		f.printMitigation("AUTH", "Implement LlamaGuard or hash the state pre-approval.", "Kybernis cryptographically binds human approval to the execution state.")
+		f.printMitigation("AUTH", 
+			"Implement LlamaGuard, NeMo Guardrails, or manually hash state pre-approval.", 
+			"Kybernis cryptographically binds human approval to the execution state, blocking all prompt injections post-approval.")
 		return fmt.Errorf("vulnerability_detected: auth")
 	}
+	
+	fmt.Println("\n✅ [PASSED] Backend blocked the context drift.")
 	return nil
 }
 
+// 5. SAGA (Shattered Saga / Incomplete Execution)
 func (f *Fuzzer) executeSagaAttack() error {
-	fmt.Println("💥 [CRASH] Simulating agent termination before step 2.")
-	f.printMitigation("SAGA", "AWS Step Functions or Temporal orchestrations.", "Kybernis maintains a cross-service orchestration ledger for rollbacks.")
+	if f.Scenario.Variant == "failed_compensation" {
+		fmt.Println("💥 [CRASH] Simulating agent executing Step 1, failing Step 2, to test backend native rollback.")
+	} else {
+		fmt.Println("💥 [CRASH] Simulating agent termination mid-execution before Step 2.")
+	}
+	
+	f.printMitigation("SAGA", 
+		"AWS Step Functions, Temporal workflows, or Saga Pattern Rollback Queues (SQS).", 
+		"Kybernis maintains a cross-service orchestration ledger with native rollback support.")
 	return fmt.Errorf("vulnerability_detected: saga")
 }
 
+// 6. RACE (Parallel Duplicate Race)
 func (f *Fuzzer) executeRaceAttack() error {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -194,16 +214,20 @@ func (f *Fuzzer) executeRaceAttack() error {
 		}(i)
 		
 		if f.Scenario.Variant == "staggered" {
-			time.Sleep(10 * time.Millisecond) // Release locks prematurely test
+			time.Sleep(10 * time.Millisecond) // Catch distributed locks that release prematurely
 		}
 	}
 	wg.Wait()
 
 	if successCount > 1 {
 		fmt.Printf("\n❌ [FAILED] Backend processed %d simultaneous executions.\n", successCount)
-		f.printMitigation("RACE", "Database Row Locks (SELECT FOR UPDATE) or Redis Redlock.", "Kybernis infrastructure automatically prevents concurrent tool spawning.")
+		f.printMitigation("RACE", 
+			"Database Row Locks (SELECT FOR UPDATE) or Redis Redlock (Distributed Leases).", 
+			"Kybernis infrastructure natively issues in-flight execution leases to prevent parallel agent spawning.")
 		return fmt.Errorf("vulnerability_detected: race")
 	}
+	
+	fmt.Println("\n✅ [PASSED] Backend caught the parallel race condition.")
 	return nil
 }
 
