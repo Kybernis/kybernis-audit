@@ -30,7 +30,7 @@ func NewTracker() *Tracker {
 
 	return &Tracker{
 		Enabled:   enabled,
-		Endpoint:  "https://api.kybernis.dev/v1/telemetry", // Telemetry ingestion endpoint
+		Endpoint:  "https://api.kybernis.io/v1/telemetry", // Telemetry ingestion endpoint
 		MachineID: machineID,
 		client: &http.Client{
 			Timeout: 3 * time.Second,

@@ -73,4 +73,4 @@ Two parallel agents or concurrent reasoning branches arrive at the same conclusi
 
 ---
 
-*For all of the above, the [Kybernis SDK Native State-Machine execution anchoring](https://kybernis.dev) provides a zero-infrastructure alternative to the community mitigations.*
+*For all of the above, the [Kybernis SDK Native State-Machine execution anchoring](https://kybernis.io) provides a zero-infrastructure alternative to the community mitigations.*

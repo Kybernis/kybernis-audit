@@ -60,7 +60,7 @@ Instead of wasting tokens hoping an LLM will hallucinate, Kybernis Audit acts as
 3. If your infrastructure processes the duplicate or partial execution, the audit fails, exposing a critical vulnerability.
 
 ## The Production Fix
-Need enforcement in production? [Kybernis SDK](https://kybernis.dev) adds deterministic execution control, pessimistic semantic locks, and Human-in-the-Loop authorization. We anchor your agent to a persistent session ID, blocking DRIFT and RACE attacks at the infrastructure level. **Diagnose with Audit; cure with the SDK.**
+Need enforcement in production? [Kybernis SDK](https://kybernis.io) adds deterministic execution control, pessimistic semantic locks, and Human-in-the-Loop authorization. We anchor your agent to a persistent session ID, blocking DRIFT and RACE attacks at the infrastructure level. **Diagnose with Audit; cure with the SDK.**
 
 ## Contributing
 Want to add new attack variants or community mitigations? Read our [Contributing Guide](./CONTRIBUTING.md).
