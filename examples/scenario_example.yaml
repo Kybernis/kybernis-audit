@@ -1,0 +1,93 @@
+# ==============================================================================
+# 📝 KYBERNIS AUDIT: FULL SCENARIO SPECIFICATION EXAMPLE
+# ==============================================================================
+# This file demonstrates every possible configuration, required field, 
+# and optional modifier for fuzzing an AI agent's tool execution endpoint.
+#
+# USAGE: kybernis-audit fuzz --config scenario_example.yaml
+# ==============================================================================
+
+# (Required) Human-readable name for the bulk audit run.
+name: "Comprehensive Agent Fuzzing Suite"
+
+# (Optional) Global target URL. Applied to all scenarios below unless overridden.
+# target_url: "http://localhost:3000/api/tools" 
+
+# (Required) A list of scenarios to execute sequentially.
+scenarios:
+
+  # ----------------------------------------------------------------------------
+  # 1. MINIMAL REQUIRED SCENARIO
+  # ----------------------------------------------------------------------------
+  - name: "Basic Duplicate Action Test (DARE)"
+    target_url: "http://localhost:3000/api/refund" # (Required if global target_url is not set)
+    attack_vector: "dare" # (Required) Must be: dare, drift, ghost, auth, saga, race
+    payload: # (Required) The baseline JSON your tool expects to process a successful request
+      user_id: "cus_123"
+      amount: 50.00
+      
+  # ----------------------------------------------------------------------------
+  # 2. FULLY COMMENTED SCENARIO WITH OPTIONALS (DRIFT)
+  # ----------------------------------------------------------------------------
+  - name: "Semantic Idempotency Bypass (DRIFT)"
+    tool: "issue_refund" # (Optional) Just for logging clarity in the terminal
+    target_url: "http://localhost:3000/api/refund"
+    attack_vector: "drift"
+    
+    # (Optional) The specific mitigation you are trying to bypass.
+    # Options for 'drift': standard, idempotency_regen, hash_bypass, semantic_equivalence
+    # Default: standard
+    variant: "hash_bypass"
+    
+    # (Optional but recommended) The JSON path where the agent usually puts its UUID.
+    # The fuzzer will dynamically mutate this field during DRIFT, DARE, and RACE attacks.
+    idempotency_key_path: "transaction_id"
+    
+    # (Optional) Wait time (in milliseconds) between the baseline and the attack.
+    # Default: 1000
+    delay_ms: 2000
+    
+    payload:
+      transaction_id: "will_be_replaced_by_fuzzer"
+      user_id: "cus_123"
+      amount: 50.00
+      _agent_reasoning: "User requested refund"
+
+  # ----------------------------------------------------------------------------
+  # 3. CONTEXT DRIFT / PROMPT INJECTION SCENARIO (AUTH)
+  # ----------------------------------------------------------------------------
+  - name: "Authorization Context Drift (AUTH)"
+    target_url: "http://localhost:3000/api/refund"
+    attack_vector: "auth"
+    
+    # Options for 'auth': privilege_escalation, scope_creep, confused_deputy
+    variant: "privilege_escalation" 
+    
+    # (Required for AUTH) The JSON path to maliciously mutate *after* simulated approval
+    auth_mutate_path: "admin_override"
+    
+    # (Required for AUTH) The malicious value to inject into the payload
+    auth_mutate_value: true
+    
+    payload:
+      user_id: "cus_123"
+      amount: 50.00
+      admin_override: false
+
+  # ----------------------------------------------------------------------------
+  # 4. CONCURRENT REASONING / RACE CONDITION SCENARIO (RACE)
+  # ----------------------------------------------------------------------------
+  - name: "Parallel Duplicate Race (RACE)"
+    target_url: "http://localhost:3000/api/refund"
+    attack_vector: "race"
+    
+    # Options for 'race': simultaneous, staggered
+    variant: "staggered"
+    
+    # (Optional) Number of concurrent goroutines to spawn simultaneously. 
+    # Default: 5
+    race_count: 10
+    
+    payload:
+      user_id: "cus_123"
+      amount: 50.00
