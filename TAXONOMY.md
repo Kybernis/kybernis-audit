@@ -60,9 +60,9 @@ An agent completes step 1 of a multi-step operation but crashes or fails before 
 *   `variant: mid_execution_crash` (Simulates an agent crashing halfway through a multi-step tool sequence)
 *   `variant: failed_compensation` (Simulates a failed step 2 to test if the backend natively rolls back step 1)
 *   🤝 **Community Mitigation:** AWS Step Functions, Temporal workflows, SQS Dead Letter Queues.
+    > ⚠️ **Warning on Autonomy:** Hardcoding agent workflows into static Step Functions or DAGs completely sacrifices the agent's autonomous reasoning. The LLM becomes a mere variable-filler for a rigid script.
 
 ---
-
 ## 6. RACE (Parallel Duplicate Race)
 Two parallel agents or concurrent reasoning branches arrive at the same conclusion and fire the exact same tool simultaneously. Without distributed locks (like an "in-flight lease"), concurrent agents will bypass standard API checks and execute duplicate mutations at the exact same millisecond.
 
