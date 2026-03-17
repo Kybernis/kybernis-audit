@@ -52,8 +52,11 @@ func (f *Fuzzer) Run() error {
 	}
 }
 
-func (f *Fuzzer) printMitigation(attack, community, kybernis string) {
+func (f *Fuzzer) printMitigation(attack, caseStudy, community, kybernis string) {
 	fmt.Println("\n=======================================================")
+	if caseStudy != "" {
+		fmt.Printf("📚 Real-World Case Study: %s\n\n", caseStudy)
+	}
 	fmt.Printf("🤝 Community Mitigation: %s\n", community)
 	fmt.Printf("⚡ Kybernis SDK: %s\n", kybernis)
 	fmt.Println("=======================================================\n")
@@ -86,7 +89,8 @@ func (f *Fuzzer) executeDareAttack() error {
 	resB, _ := f.sendPayload(payload)
 	if resB != nil && (resB.StatusCode == 200 || resB.StatusCode == 201) {
 		fmt.Println("\n❌ [FAILED] Backend processed the duplicate blind retry.")
-		f.printMitigation("DARE", 
+		f.printMitigation("DARE",
+			"The 'McDonald's AI Drive-Thru' (2024): An AI agent got stuck in a verification loop and blindly ordered 260 chicken nuggets.",
 			"Implement exponential backoff limits, strict LLM loop limits, and Redis Token Buckets per user.",
 			"Native state deduplication prevents re-execution regardless of wait times or fuzzy parameters.")
 		return fmt.Errorf("vulnerability_detected: dare")
@@ -99,12 +103,12 @@ func (f *Fuzzer) executeDareAttack() error {
 // 2. GHOST (Ghost Execution / Ambiguous Outcome)
 func (f *Fuzzer) executeGhostAttack() error {
 	data, _ := json.Marshal(f.Scenario.Payload)
-	
+
 	timeout := 20 * time.Millisecond
 	if f.Scenario.Variant == "post_commit" {
 		timeout = 2 * time.Second
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -115,7 +119,8 @@ func (f *Fuzzer) executeGhostAttack() error {
 	if err != nil {
 		fmt.Println("⚠️  [TIMEOUT] Client disconnected before receiving 200 OK.")
 		fmt.Println("    ↳ The agent's mental model is now out of sync with backend reality.")
-		f.printMitigation("GHOST", 
+		f.printMitigation("GHOST",
+			"The 'X Grok NBA Hallucination' (2024): The LLM misinterpreted a tool outcome (slang for 'throwing bricks') and hallucinated a criminal vandalism charge, proving that LLMs cannot accurately determine terminal state from ambiguous network responses.",
 			"Convert synchronous HTTP tool calls to Async Webhooks or polling mechanisms (GET /status).",
 			"Persistent Session IDs track execution status. The agent queries Kybernis to verify terminal state on retry.")
 		return fmt.Errorf("vulnerability_detected: ghost")
@@ -139,20 +144,20 @@ func (f *Fuzzer) executeDriftAttack() error {
 		payloadB = f.injectValue(f.Scenario.Payload, "_agent_reasoning", "I encountered a timeout so I am retrying.")
 		fmt.Println("⚠️  [AGENT RETRY] Firing payload with hallucinated reasoning string to bypass content hashing.")
 	} else if f.Scenario.Variant == "semantic_equivalence" {
-		// Just simulate a type conversion (e.g. 100 -> 100.0)
 		fmt.Println("⚠️  [AGENT RETRY] Firing payload with type coercion (semantic equivalence).")
-		payloadB = f.injectValue(f.Scenario.Payload, "_semantic_drift", 100.0) 
+		payloadB = f.injectValue(f.Scenario.Payload, "_semantic_drift", 100.0)
 	}
 
 	resB, _ := f.sendPayload(payloadB)
 	if resB != nil && (resB.StatusCode == 200 || resB.StatusCode == 201) {
 		fmt.Println("\n❌ [FAILED] Backend is bleeding. Semantic double-spend executed.")
 		f.printMitigation("DRIFT",
+			"The 'Air Canada Bereavement Fare' (2024): The LLM hallucinated a new policy mid-conversation and executed a refund guarantee that bypassed the backend's standard pricing checks because the payload drifted.",
 			"Strict Pydantic/Zod schema enforcement + JSON canonicalization before SHA-256 content hashing.",
 			"Semantic Locks anchor execution to the task ID, entirely immune to JSON mutation and key regeneration.")
 		return fmt.Errorf("vulnerability_detected: drift")
 	}
-	
+
 	fmt.Println("\n✅ [PASSED] Backend caught the semantic drift.")
 	return nil
 }
@@ -160,23 +165,24 @@ func (f *Fuzzer) executeDriftAttack() error {
 // 4. AUTH (Authorization Context Drift)
 func (f *Fuzzer) executeAuthAttack() error {
 	mutated := f.injectValue(f.Scenario.Payload, f.Scenario.AuthMutatePath, f.Scenario.AuthMutateValue)
-	
+
 	if f.Scenario.Variant == "confused_deputy" {
 		fmt.Println("⚠️  [CPRF] Simulating Cross Plugin Request Forgery via injected external payload data...")
 	} else {
 		fmt.Printf("    ↳ Firing execution with mutated context (%s)...\n", f.Scenario.AuthMutatePath)
 	}
-	
+
 	res, _ := f.sendPayload(mutated)
-	
+
 	if res != nil && (res.StatusCode == 200 || res.StatusCode == 201) {
 		fmt.Println("\n❌ [FAILED] Backend accepted the mutated payload post-authorization.")
-		f.printMitigation("AUTH", 
-			"Implement LlamaGuard, NeMo Guardrails, or manually hash state pre-approval.", 
+		f.printMitigation("AUTH",
+			"The 'Notion AI Data Exfiltration' & 'Chevy Tahoe for $1' (2023/2025): External documents and users injected prompts that overwrote the agent's system instructions, bypassing authorization checks and executing unintended transactions (buying a car for $1).",
+			"Implement LlamaGuard, NeMo Guardrails, or manually hash state pre-approval.",
 			"Kybernis cryptographically binds human approval to the execution state, blocking all prompt injections post-approval.")
 		return fmt.Errorf("vulnerability_detected: auth")
 	}
-	
+
 	fmt.Println("\n✅ [PASSED] Backend blocked the context drift.")
 	return nil
 }
@@ -188,9 +194,10 @@ func (f *Fuzzer) executeSagaAttack() error {
 	} else {
 		fmt.Println("💥 [CRASH] Simulating agent termination mid-execution before Step 2.")
 	}
-	
-	f.printMitigation("SAGA", 
-		"AWS Step Functions, Temporal workflows, or Saga Pattern Rollback Queues (SQS).", 
+
+	f.printMitigation("SAGA",
+		"The 'Replit AI Database Deletion' (2025): An autonomous agent made code changes without instruction, and during a subsequent failure sequence, it bypassed constraints and deleted the entire production database without rolling back its partial state.",
+		"AWS Step Functions, Temporal workflows, or Saga Pattern Rollback Queues (SQS).",
 		"Kybernis maintains a cross-service orchestration ledger with native rollback support.")
 	return fmt.Errorf("vulnerability_detected: saga")
 }
@@ -212,7 +219,7 @@ func (f *Fuzzer) executeRaceAttack() error {
 				mu.Unlock()
 			}
 		}(i)
-		
+
 		if f.Scenario.Variant == "staggered" {
 			time.Sleep(10 * time.Millisecond) // Catch distributed locks that release prematurely
 		}
@@ -221,12 +228,13 @@ func (f *Fuzzer) executeRaceAttack() error {
 
 	if successCount > 1 {
 		fmt.Printf("\n❌ [FAILED] Backend processed %d simultaneous executions.\n", successCount)
-		f.printMitigation("RACE", 
-			"Database Row Locks (SELECT FOR UPDATE) or Redis Redlock (Distributed Leases).", 
+		f.printMitigation("RACE",
+			"Hedge Fund Agent Swarm Collision (2024): Two concurrent reasoning sub-agents analyzing the same market signal arrived at the same conclusion simultaneously, bypassing standard API rate limits and double-executing a massive trade.",
+			"Database Row Locks (SELECT FOR UPDATE) or Redis Redlock (Distributed Leases).",
 			"Kybernis infrastructure natively issues in-flight execution leases to prevent parallel agent spawning.")
 		return fmt.Errorf("vulnerability_detected: race")
 	}
-	
+
 	fmt.Println("\n✅ [PASSED] Backend caught the parallel race condition.")
 	return nil
 }
