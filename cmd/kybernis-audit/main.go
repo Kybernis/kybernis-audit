@@ -18,6 +18,8 @@ func main() {
 	}
 
 	tracker := telemetry.NewTracker()
+	defer tracker.Close() // Ensure telemetry fires before exit
+
 	tracker.TrackEvent("cli_started", map[string]interface{}{"command": os.Args[1], "version": "v1.1.0-alpha"})
 
 	switch os.Args[1] {
@@ -58,6 +60,14 @@ func runFuzzer(args []string, tracker *telemetry.Tracker) {
 
 	fuzz := fuzzer.NewFuzzer(url, cfg)
 	err = fuzz.Run()
+	
+	// Track the fuzzer outcome
+	tracker.TrackEvent("audit_completed", map[string]interface{}{
+		"attack_vector": cfg.AttackVector,
+		"variant":       cfg.Variant,
+		"vulnerable":    err != nil, // If err != nil, backend failed (it's vulnerable)
+	})
+
 	if err != nil {
 		log.Fatalf("\nAudit Failed: %v", err)
 	}
